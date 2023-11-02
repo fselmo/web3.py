@@ -59,6 +59,11 @@ class BaseProvider:
     def make_request(self, method: RPCEndpoint, params: Any) -> RPCResponse:
         raise NotImplementedError("Providers must implement this method")
 
+    def make_batch_request(
+        self, requests: Sequence[Tuple[RPCEndpoint, Any]]
+    ) -> Sequence[RPCResponse]:
+        raise NotImplementedError("Providers must implement this method")
+
     def is_connected(self, show_traceback: bool = False) -> bool:
         raise NotImplementedError("Providers must implement this method")
 
@@ -104,3 +109,22 @@ class JSONBaseProvider(BaseProvider):
             if show_traceback:
                 raise ProviderConnectionError(f"Bad jsonrpc version: {response}")
             return False
+
+    #  -- batch requests -- #
+
+    def encode_batch_rpc_request(
+        self, requests: Sequence[Tuple[RPCEndpoint, Any]]
+    ) -> bytes:
+        return (
+            b"["
+            + b", ".join(
+                self.encode_rpc_request(method, params) for method, params in requests
+            )
+            + b"]"
+        )
+
+    def decode_batch_rpc_response(self, raw_response: bytes) -> Sequence[RPCResponse]:
+        text_response = to_text(raw_response)
+        return cast(
+            Sequence[RPCResponse], FriendlyJsonSerde().json_decode(text_response)
+        )

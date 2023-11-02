@@ -129,3 +129,22 @@ class HTTPProvider(JSONBaseProvider):
             f"Method: {method}, Response: {response}"
         )
         return response
+
+    def make_batch_request(
+        self, batch_requests: Iterable[Tuple[RPCEndpoint, Any]]
+    ) -> Tuple[RPCResponse, ...]:
+        self.logger.debug(
+            f"Making batch request HTTP. URI: {self.endpoint_uri}, "
+            f"Batch Requests: {batch_requests}"
+        )
+        requests = [request_info[0] for request_info in batch_requests]
+        request_data: bytes = self.encode_batch_rpc_request(requests)
+        raw_response = make_post_request(
+            self.endpoint_uri, request_data, **self.get_request_kwargs()
+        )
+        responses = self.decode_batch_rpc_response(raw_response)
+        self.logger.debug(
+            f"Getting batch response HTTP. URI: {self.endpoint_uri}, "
+            f"Batch Requests: {batch_requests}, Responses: {responses}"
+        )
+        return responses

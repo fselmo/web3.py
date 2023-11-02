@@ -385,9 +385,12 @@ class Eth(BaseEth):
     )
 
     def get_block(
-        self, block_identifier: BlockIdentifier, full_transactions: bool = False
+        self,
+        block_identifier: BlockIdentifier,
+        full_transactions: bool = False,
+        **kwargs,
     ) -> BlockData:
-        return self._get_block(block_identifier, full_transactions)
+        return self._get_block(block_identifier, full_transactions, **kwargs)
 
     # eth_getBalance
 
@@ -402,8 +405,9 @@ class Eth(BaseEth):
         self,
         account: Union[Address, ChecksumAddress, ENS],
         block_identifier: Optional[BlockIdentifier] = None,
+        **kwargs,
     ) -> Wei:
-        return self._get_balance(account, block_identifier)
+        return self._get_balance(account, block_identifier, **kwargs)
 
     # eth_getCode
 

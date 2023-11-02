@@ -337,7 +337,61 @@ class RequestManager:
             response, params, error_formatters, null_result_formatters
         )
 
-    async def make_batch_request(self, requests_info) -> List[RPCResponse]:
+    def make_batch_request(self, requests_info) -> List[RPCResponse]:
+        """
+        Make a batch request using the provider
+        """
+        formatted_requests_info = []
+        for method, params_list in requests_info.items():
+            # get the request info for each method
+            for params in params_list:
+                # process the params through the munger and request formatters
+                ((method_name, params), response_formatters) = method(
+                    params, batch=True
+                )
+
+                # process the params through the middleware stack
+                for middleware, _name in self.middleware_onion.middlewares:
+                    (_, __, params) = middleware.process_request_params(
+                        self.w3, method_name, params
+                    )
+
+                formatted_requests_info.append(
+                    ((method_name, params), response_formatters)
+                )
+
+        self.logger.debug(f"Making batch request. Payload: {formatted_requests_info}")
+
+        responses = self.provider.make_batch_request(formatted_requests_info)
+        matched = zip(responses, formatted_requests_info)
+        processed = []
+        for resp, info in matched:
+            for middleware, _name in reversed(self.middleware_onion.middlewares):
+                resp = middleware.process_response(resp)
+            processed.append((resp, info))
+
+        formatted = []
+        for resp, info in processed:
+            (
+                result_formatters,
+                error_formatters,
+                null_result_formatters,
+            ) = info[1]
+            try:
+                formatted_response = apply_result_formatters(
+                    result_formatters,
+                    self.formatted_response(
+                        resp, info[0][1], error_formatters, null_result_formatters
+                    ),
+                )
+            except Exception as e:
+                formatted_response = e
+
+            formatted.append(formatted_response)
+
+        return formatted
+
+    async def async_make_batch_request(self, requests_info) -> List[RPCResponse]:
         """
         Make a batch request using the provider
         """
