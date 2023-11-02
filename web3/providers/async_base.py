@@ -1,6 +1,5 @@
 import asyncio
 import itertools
-import json
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -133,28 +132,12 @@ class AsyncJSONBaseProvider(AsyncBaseProvider):
         encoded = FriendlyJsonSerde().json_encode(rpc_dict, cls=Web3JsonEncoder)
         return to_bytes(text=encoded)
 
-    def encode_batch_rpc_request(
-        self, requests: Iterable[Tuple[RPCEndpoint, Any]]
-    ) -> bytes:
-        return (
-            b"["
-            + b", ".join(
-                self.encode_rpc_request(method, params) for method, params in requests
-            )
-            + b"]"
-        )
-
-    def decode_rpc_response(self, raw_response: bytes) -> RPCResponse:
+    @staticmethod
+    def decode_rpc_response(raw_response: bytes) -> RPCResponse:
         text_response = str(
             to_text(raw_response) if not is_text(raw_response) else raw_response
         )
         return cast(RPCResponse, FriendlyJsonSerde().json_decode(text_response))
-
-    def decode_batch_rpc_response(self, raw_response: bytes) -> List[RPCResponse]:
-        text_response = str(
-            to_text(raw_response) if not is_text(raw_response) else raw_response
-        )
-        return json.loads(text_response)
 
     async def is_connected(self, show_traceback: bool = False) -> bool:
         try:
@@ -179,3 +162,16 @@ class AsyncJSONBaseProvider(AsyncBaseProvider):
             if show_traceback:
                 raise ProviderConnectionError(f"Bad jsonrpc version: {response}")
             return False
+
+    # -- batch requests -- #
+
+    def encode_batch_rpc_request(
+        self, requests: Iterable[Tuple[RPCEndpoint, Any]]
+    ) -> bytes:
+        return (
+            b"["
+            + b", ".join(
+                self.encode_rpc_request(method, params) for method, params in requests
+            )
+            + b"]"
+        )

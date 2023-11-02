@@ -23,6 +23,9 @@ from websockets.exceptions import (
     ConnectionClosedOK,
 )
 
+from web3._utils.batching import (
+    BatchRequestContextManager,
+)
 from web3._utils.caching import (
     generate_cache_key,
 )
@@ -53,7 +56,11 @@ from web3.module import (
 )
 from web3.providers import (
     AutoProvider,
+    JSONBaseProvider,
     PersistentConnectionProvider,
+)
+from web3.providers.async_base import (
+    AsyncJSONBaseProvider,
 )
 from web3.types import (
     RPCEndpoint,
@@ -311,6 +318,103 @@ class RequestManager:
         return self.formatted_response(
             response, params, error_formatters, null_result_formatters
         )
+
+    def make_batch_request(
+        self, requests_info: Sequence[Tuple[RPCEndpoint, Any]]
+    ) -> List[RPCResponse]:
+        """
+        Make a batch request using the provider
+        """
+        if not isinstance(self.provider, JSONBaseProvider):
+            raise TypeError("Only JSONBaseProvider classes support batched requests.")
+
+        current_middleware = [
+            middleware(self.w3)
+            for middleware, _name in self.middleware_onion.middlewares
+        ]
+        formatted_requests_info = []
+        for (method, params), response_processors in requests_info:
+            for middleware in current_middleware:
+                (_method, params) = middleware.request_processor(method, params)
+            formatted_requests_info.append(((method, params), response_processors))
+
+        responses = self.provider.make_batch_request(
+            [request_info[0] for request_info in formatted_requests_info]
+        )
+        matched = zip(responses, formatted_requests_info)
+
+        processed = []
+        for response, info in matched:
+            for middleware in reversed(current_middleware):
+                response = middleware.response_processor(info[0][0], response)
+            processed.append((response, info))
+
+        return self._process_batched_request_responses(processed)
+
+    def batch_requests(self) -> BatchRequestContextManager:
+        """
+        Context manager for making batch requests
+        """
+        return BatchRequestContextManager(self.w3)
+
+    async def async_make_batch_request(
+        self, requests_info: Sequence[Tuple[RPCEndpoint, Any]]
+    ) -> List[RPCResponse]:
+        """
+        Make a batch request using the provider
+        """
+        if not isinstance(self.provider, AsyncJSONBaseProvider):
+            raise TypeError(
+                "Only AsyncJSONBaseProvider classes support batched requests."
+            )
+
+        current_middleware = [
+            middleware(self.w3)
+            for middleware, _name in self.middleware_onion.middlewares
+        ]
+        formatted_requests_info = []
+        for (method, params), response_processors in requests_info:
+            for middleware in current_middleware:
+                (_method, params) = await middleware.async_request_processor(
+                    method, params
+                )
+            formatted_requests_info.append(((method, params), response_processors))
+
+        responses = await self.provider.make_batch_request(
+            [request_info[0] for request_info in formatted_requests_info]
+        )
+        matched = zip(responses, formatted_requests_info)
+
+        processed = []
+        for response, info in matched:
+            for middleware in reversed(current_middleware):
+                response = await middleware.async_response_processor(
+                    info[0][0], response
+                )
+            processed.append((response, info))
+
+        return self._process_batched_request_responses(processed)
+
+    def _process_batched_request_responses(self, processed_request_info: Any) -> Any:
+        formatted = []
+        for resp, info in processed_request_info:
+            (
+                result_formatters,
+                error_formatters,
+                null_result_formatters,
+            ) = info[1]
+            try:
+                formatted_response = apply_result_formatters(
+                    result_formatters,
+                    self.formatted_response(
+                        resp, info[0][1], error_formatters, null_result_formatters
+                    ),
+                )
+            except Exception as e:
+                formatted_response = e
+
+            formatted.append(formatted_response)
+        return formatted
 
     # -- persistent connection -- #
 

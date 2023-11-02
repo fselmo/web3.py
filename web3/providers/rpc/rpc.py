@@ -5,9 +5,12 @@ from typing import (
     Any,
     Dict,
     Iterable,
+    List,
     Optional,
+    Sequence,
     Tuple,
     Union,
+    cast,
 )
 
 from eth_typing import (
@@ -142,3 +145,19 @@ class HTTPProvider(JSONBaseProvider):
             f"Method: {method}, Response: {response}"
         )
         return response
+
+    def make_batch_request(
+        self, batch_requests: Sequence[Tuple[RPCEndpoint, Any]]
+    ) -> List[RPCResponse]:
+        self.logger.debug(
+            f"Making batch request HTTP:\n    uri={self.endpoint_uri},\n    "
+            f"payload={batch_requests}."
+        )
+        request_data = self.encode_batch_rpc_request(batch_requests)
+        raw_response = make_post_request(
+            self.endpoint_uri, request_data, **self.get_request_kwargs()
+        )
+        self.logger.debug("Received batch response HTTP.")
+        responses_list = cast(List[RPCResponse], self.decode_rpc_response(raw_response))
+        # sort by response `id` since the JSON-RPC 2.0 spec doesn't guarantee order
+        return sorted(responses_list, key=lambda resp: int(resp["id"]))

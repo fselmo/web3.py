@@ -57,7 +57,9 @@ TReturn = TypeVar("TReturn")
 
 @curry
 def retrieve_blocking_method_call_fn(
-    w3: "Web3", module: "Module", method: Method[Callable[..., TReturn]]
+    w3: "Web3",
+    module: "Module",
+    method: Method[Callable[..., TReturn]],
 ) -> Callable[..., Union[TReturn, LogFilter]]:
     def caller(*args: Any, **kwargs: Any) -> Union[TReturn, LogFilter]:
         try:
@@ -82,7 +84,9 @@ def retrieve_blocking_method_call_fn(
 
 @curry
 def retrieve_async_method_call_fn(
-    async_w3: "AsyncWeb3", module: "Module", method: Method[Callable[..., Any]]
+    async_w3: "AsyncWeb3",
+    module: "Module",
+    method: Method[Callable[..., Any]],
 ) -> Callable[..., Coroutine[Any, Any, Optional[Union[RPCResponse, AsyncLogFilter]]]]:
     async def caller(*args: Any, **kwargs: Any) -> Union[RPCResponse, AsyncLogFilter]:
         try:
@@ -99,6 +103,10 @@ def retrieve_async_method_call_fn(
             cache_key = provider._request_processor.cache_request_information(
                 method_str, params, response_formatters  # type: ignore
             )
+
+            if async_w3._is_batching:
+                return ((method_str, params), response_formatters)
+
             try:
                 method_str = cast(RPCEndpoint, method_str)
                 return await async_w3.manager.ws_send(method_str, params)
@@ -113,6 +121,9 @@ def retrieve_async_method_call_fn(
                     )
                 raise e
         else:
+            if async_w3._is_batching:
+                return ((method_str, params), response_formatters)
+
             (
                 result_formatters,
                 error_formatters,

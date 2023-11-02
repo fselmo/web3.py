@@ -4,6 +4,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Sequence,
     Set,
     Tuple,
     cast,
@@ -110,6 +111,11 @@ class BaseProvider:
     def make_request(self, method: RPCEndpoint, params: Any) -> RPCResponse:
         raise NotImplementedError("Providers must implement this method")
 
+    def make_batch_request(
+        self, requests: Sequence[Tuple[RPCEndpoint, Any]]
+    ) -> Sequence[RPCResponse]:
+        raise NotImplementedError("Providers must implement this method")
+
     def is_connected(self, show_traceback: bool = False) -> bool:
         raise NotImplementedError("Providers must implement this method")
 
@@ -118,10 +124,6 @@ class JSONBaseProvider(BaseProvider):
     def __init__(self) -> None:
         self.request_counter = itertools.count()
         super().__init__()
-
-    def decode_rpc_response(self, raw_response: bytes) -> RPCResponse:
-        text_response = to_text(raw_response)
-        return cast(RPCResponse, FriendlyJsonSerde().json_decode(text_response))
 
     def encode_rpc_request(self, method: RPCEndpoint, params: Any) -> bytes:
         rpc_dict = {
@@ -132,6 +134,11 @@ class JSONBaseProvider(BaseProvider):
         }
         encoded = FriendlyJsonSerde().json_encode(rpc_dict, Web3JsonEncoder)
         return to_bytes(text=encoded)
+
+    @staticmethod
+    def decode_rpc_response(raw_response: bytes) -> RPCResponse:
+        text_response = to_text(raw_response)
+        return cast(RPCResponse, FriendlyJsonSerde().json_decode(text_response))
 
     def is_connected(self, show_traceback: bool = False) -> bool:
         try:
@@ -156,3 +163,16 @@ class JSONBaseProvider(BaseProvider):
             if show_traceback:
                 raise ProviderConnectionError(f"Bad jsonrpc version: {response}")
             return False
+
+    #  -- batch requests -- #
+
+    def encode_batch_rpc_request(
+        self, requests: Sequence[Tuple[RPCEndpoint, Any]]
+    ) -> bytes:
+        return (
+            b"["
+            + b", ".join(
+                self.encode_rpc_request(method, params) for method, params in requests
+            )
+            + b"]"
+        )

@@ -149,7 +149,7 @@ class Method(Generic[TFunc]):
         if obj is None:
             raise TypeError(
                 "Direct calls to methods are not supported. "
-                "Methods must be called from an module instance, "
+                "Methods must be called from a module instance, "
                 "usually attached to a web3 instance."
             )
         return obj.retrieve_caller_fn(self)
