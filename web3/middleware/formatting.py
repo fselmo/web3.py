@@ -173,6 +173,13 @@ async def async_construct_web3_formatting_middleware(
         async_w3: "AsyncWeb3",
     ) -> AsyncMiddlewareCoroutine:
         async def middleware(method: RPCEndpoint, params: Any) -> Optional[RPCResponse]:
+            if isinstance(method, list):
+                for index, entry in enumerate(method):
+                    _method, _params = entry[0]
+                    _params = await middleware(_method, _params)
+                    method[index] = ((_method, _params), entry[1])
+                return await make_request(method, params)
+
             formatters = merge(
                 FORMATTER_DEFAULTS,
                 await async_web3_formatters_builder(async_w3, method),

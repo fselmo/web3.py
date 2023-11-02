@@ -15,6 +15,8 @@ from typing import (
 )
 import warnings
 
+from toolz import curry
+
 from eth_utils.curried import (
     to_tuple,
 )
@@ -146,7 +148,9 @@ class Method(Generic[TFunc]):
         self.is_property = is_property
 
     def __get__(
-        self, obj: Optional["Module"] = None, obj_type: Optional[Type["Module"]] = None
+        self,
+        obj: Optional["Module"] = None,
+        obj_type: Optional[Type["Module"]] = None,
     ) -> TFunc:
         if obj is None:
             raise TypeError(
@@ -154,7 +158,24 @@ class Method(Generic[TFunc]):
                 "Methods must be called from an module instance, "
                 "usually attached to a web3 instance."
             )
-        return obj.retrieve_caller_fn(self)
+
+        self._obj = obj
+        return self._get()
+
+    def _get(self, *args: Any, **kwargs: Any) -> TFunc:
+        def _inner(*args: Any, batch: bool = False) -> "Method":
+            async def _coro() -> "Method":
+                (method_str, params), response_formatters = self.process_params(
+                    self._obj, *args, **kwargs
+                )
+                return ((method_str, params), response_formatters)
+
+            if batch:
+                return _coro()
+
+            return self._obj.retrieve_caller_fn(self)(*args, **kwargs)
+
+        return _inner
 
     @property
     def method_selector_fn(

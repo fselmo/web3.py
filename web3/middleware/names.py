@@ -114,6 +114,13 @@ async def async_name_to_address_middleware(
     async_w3: "AsyncWeb3",
 ) -> AsyncMiddlewareCoroutine:
     async def middleware(method: RPCEndpoint, params: Any) -> Any:
+        if isinstance(method, list):
+            for index, entry in enumerate(method):
+                _method, _params = entry[0]
+                _params = await middleware(_method, _params)
+                method[index] = ((_method, _params), entry[1])
+            return await make_request(method, params)
+
         abi_types_for_method = RPC_ABIS.get(method, None)
 
         if abi_types_for_method is not None:

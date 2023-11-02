@@ -37,6 +37,7 @@ from web3.datastructures import (
     NamedElementOnion,
 )
 
+
 if TYPE_CHECKING:
     from web3.contract.async_contract import AsyncContractFunction  # noqa: F401
     from web3.contract.contract import ContractFunction  # noqa: F401

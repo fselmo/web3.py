@@ -13,6 +13,7 @@ from eth_utils.toolz import (
 from web3.datastructures import (
     AttributeDict,
 )
+from web3.middleware.base import Web3Middleware
 from web3.types import (
     AsyncMiddlewareCoroutine,
     RPCEndpoint,
@@ -27,6 +28,48 @@ if TYPE_CHECKING:
     from web3.providers import (  # noqa: F401
         PersistentConnectionProvider,
     )
+
+
+class AttributeDictMiddleware(Web3Middleware):
+    """
+    Converts any result which is a dictionary into an `AttributeDict`.
+
+    Note: Accessing `AttributeDict` properties via attribute
+        (e.g. my_attribute_dict.property1) will not preserve typing.
+    """
+
+    def process_request_params(
+        self, w3: "Web3", method: RPCEndpoint, params: Any
+    ) -> Any:
+        return (w3, method, params)
+
+    def process_response(self, response: RPCResponse) -> RPCResponse:
+        if "result" in response:
+            return assoc(
+                response, "result", AttributeDict.recursive(response["result"])
+            )
+        else:
+            return response
+
+    # -- async -- #
+
+    async def async_process_request_params(
+        self, async_w3: "AsyncWeb3", method: RPCEndpoint, params: Any
+    ) -> Any:
+        return (async_w3, method, params)
+
+    async def async_process_response(
+        self, async_w3: "AsyncWeb3", response: "RPCResponse"
+    ) -> "RPCResponse":
+        if async_w3.provider.has_persistent_connection:
+            # asynchronous response processing
+            provider = cast("PersistentConnectionProvider", async_w3.provider)
+            provider._request_processor.append_middleware_response_processor(
+                _handle_async_response
+            )
+            return response
+        else:
+            return _handle_async_response(response)
 
 
 def attrdict_middleware(

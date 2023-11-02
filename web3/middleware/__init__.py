@@ -40,10 +40,6 @@ from .cache import (
 from .exception_handling import (
     construct_exception_handler_middleware,
 )
-from .exception_retry_request import (
-    async_http_retry_request_middleware,
-    http_retry_request_middleware,
-)
 from .filter import (
     async_local_filter_middleware,
     local_filter_middleware,
@@ -59,8 +55,7 @@ from .formatting import (
     construct_formatting_middleware,
 )
 from .gas_price_strategy import (
-    async_gas_price_strategy_middleware,
-    gas_price_strategy_middleware,
+    GasPriceStrategyMiddleware,
 )
 from .geth_poa import (
     async_geth_poa_middleware,

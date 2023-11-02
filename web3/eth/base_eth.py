@@ -108,7 +108,10 @@ class BaseEth(Module):
         return params
 
     def get_block_munger(
-        self, block_identifier: BlockIdentifier, full_transactions: bool = False
+        self,
+        block_identifier: BlockIdentifier,
+        full_transactions: bool = False,
+        batch: bool = False,
     ) -> Tuple[BlockIdentifier, bool]:
         return (block_identifier, full_transactions)
 

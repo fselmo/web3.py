@@ -411,9 +411,16 @@ class AsyncEth(BaseEth):
     )
 
     async def get_block(
-        self, block_identifier: BlockIdentifier, full_transactions: bool = False
+        self,
+        block_identifier: BlockIdentifier,
+        full_transactions: bool = False,
+        batch: bool = False,
     ) -> BlockData:
-        return await self._get_block(block_identifier, full_transactions)
+        return await self._get_block(
+            block_identifier,
+            full_transactions,
+            batch=batch,
+        )
 
     # eth_getBalance
 

@@ -36,19 +36,21 @@ from web3.exceptions import (
     BadResponseFormat,
     MethodUnavailable,
 )
+from web3.method import Method
 from web3.middleware import (
+    GasPriceStrategyMiddleware,
     abi_middleware,
     async_attrdict_middleware,
     async_buffered_gas_estimate_middleware,
-    async_gas_price_strategy_middleware,
     async_name_to_address_middleware,
     async_validation_middleware,
     attrdict_middleware,
     buffered_gas_estimate_middleware,
-    gas_price_strategy_middleware,
     name_to_address_middleware,
     validation_middleware,
 )
+from web3.middleware.attrdict import AttributeDictMiddleware
+from web3.middleware.base import Web3Middleware
 from web3.module import (
     apply_result_formatters,
 )
@@ -143,11 +145,7 @@ class RequestManager:
             self.provider = provider
 
         if middlewares is None:
-            middlewares = (
-                self.async_default_middlewares()
-                if self.provider.is_async
-                else self.default_middlewares(cast("Web3", w3))
-            )
+            middlewares = self.default_middlewares(w3)
 
         self.middleware_onion = NamedElementOnion(middlewares)
 
@@ -169,33 +167,18 @@ class RequestManager:
         self._provider = provider
 
     @staticmethod
-    def default_middlewares(w3: "Web3") -> List[Tuple[Middleware, str]]:
+    def default_middlewares(w3: "Web3") -> List[Tuple[Web3Middleware, str]]:
         """
         List the default middlewares for the request manager.
         Leaving w3 unspecified will prevent the middleware from resolving names.
         Documentation should remain in sync with these defaults.
         """
         return [
-            (gas_price_strategy_middleware, "gas_price_strategy"),
-            (name_to_address_middleware(w3), "name_to_address"),
-            (attrdict_middleware, "attrdict"),
-            (validation_middleware, "validation"),
-            (abi_middleware, "abi"),
-            (buffered_gas_estimate_middleware, "gas_estimate"),
-        ]
-
-    @staticmethod
-    def async_default_middlewares() -> List[Tuple[AsyncMiddleware, str]]:
-        """
-        List the default async middlewares for the request manager.
-        Documentation should remain in sync with these defaults.
-        """
-        return [
-            (async_gas_price_strategy_middleware, "gas_price_strategy"),
-            (async_name_to_address_middleware, "name_to_address"),
-            (async_attrdict_middleware, "attrdict"),
-            (async_validation_middleware, "validation"),
-            (async_buffered_gas_estimate_middleware, "gas_estimate"),
+            (GasPriceStrategyMiddleware(), "gas_price_strategy"),
+            # (async_name_to_address_middleware, "name_to_address"),
+            (AttributeDictMiddleware(), "attrdict"),
+            # (async_validation_middleware, "validation"),
+            # (async_buffered_gas_estimate_middleware, "gas_estimate"),
         ]
 
     #
@@ -204,23 +187,45 @@ class RequestManager:
     def _make_request(
         self, method: Union[RPCEndpoint, Callable[..., RPCEndpoint]], params: Any
     ) -> RPCResponse:
-        provider = cast("BaseProvider", self.provider)
-        request_func = provider.request_func(
-            cast("Web3", self.w3), cast(MiddlewareOnion, self.middleware_onion)
-        )
+        """
+        1. Pipe the request params through the middleware stack
+        2. Make the request using the provider
+        3. Pipe the raw response through the middleware stack
+        """
         self.logger.debug(f"Making request. Method: {method}")
-        return request_func(method, params)
+        for middleware, _name in self.middleware_onion.middlewares:
+            _w3, _method, params = middleware.process_request_params(
+                self.w3, method, params
+            )
+        raw_response = self.provider.make_request(method, params)
+        response = pipe(
+            raw_response,
+            *[
+                middleware.process_response
+                for middleware, _name in reversed(self.middleware_onion.middlewares)
+            ],
+        )
+        return response
 
     async def _coro_make_request(
         self, method: Union[RPCEndpoint, Callable[..., RPCEndpoint]], params: Any
     ) -> RPCResponse:
-        provider = cast("AsyncBaseProvider", self.provider)
-        request_func = await provider.request_func(
-            cast("AsyncWeb3", self.w3),
-            cast(AsyncMiddlewareOnion, self.middleware_onion),
-        )
+        """
+        1. Pipe the request params through the middleware stack
+        2. Make the request using the provider
+        3. Pipe the raw response through the middleware stack
+        """
         self.logger.debug(f"Making request. Method: {method}")
-        return await request_func(method, params)
+        for middleware, _name in self.middleware_onion.middlewares:
+            _w3, _method, params = await middleware.async_process_request_params(
+                self.w3, method, params
+            )
+        raw_response = await self.provider.make_request(method, params)
+        response = raw_response
+        for middleware, _name in reversed(self.middleware_onion.middlewares):
+            response = await middleware.async_process_response(self.w3, response)
+
+        return response
 
     #
     # formatted_response parses and validates JSON-RPC responses for expected
@@ -340,6 +345,52 @@ class RequestManager:
         return self.formatted_response(
             response, params, error_formatters, null_result_formatters
         )
+
+    async def make_batch_request(self, requests_info) -> List[RPCResponse]:
+        """
+        Make a batch request using the provider
+        """
+        self.logger.debug(
+            f"Making batch request. Payload: {tuple(req_info[0] for req_info in requests_info)}"
+        )
+
+        formatted_requests_info = []
+        for request_info in requests_info:
+            method, params = request_info[0]
+            for middleware, _name in self.middleware_onion.middlewares:
+                _w3, _method, params = middleware.process_request_params(
+                    self.w3, method, params
+                )
+            formatted_requests_info.append(((method, params), request_info[1]))
+
+        responses = await self.provider.make_batch_request(formatted_requests_info)
+        matched = zip(responses, requests_info)
+        processed = []
+        for resp, info in matched:
+            for middleware, _name in reversed(self.middleware_onion.middlewares):
+                resp = middleware.process_response(resp)
+            processed.append((resp, info))
+
+        formatted = []
+        for resp, info in processed:
+            (
+                result_formatters,
+                error_formatters,
+                null_result_formatters,
+            ) = info[1]
+            try:
+                formatted_response = apply_result_formatters(
+                    result_formatters,
+                    self.formatted_response(
+                        resp, info[0][1], error_formatters, null_result_formatters
+                    ),
+                )
+            except Exception as e:
+                formatted_response = e
+
+            formatted.append(formatted_response)
+
+        return formatted
 
     # persistent connection
     async def ws_send(self, method: RPCEndpoint, params: Any) -> RPCResponse:
