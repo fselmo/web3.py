@@ -21,7 +21,6 @@ from web3._utils.compat import (
     Literal,
 )
 from web3.middleware.attrdict import (
-    async_attrdict_middleware,
     attrdict_middleware,
 )
 from web3.middleware.buffered_gas_estimate import (
@@ -53,10 +52,10 @@ if TYPE_CHECKING:
 
 class AsyncEthereumTesterProvider(AsyncBaseProvider):
     middlewares = (
-        async_attrdict_middleware,
-        async_buffered_gas_estimate_middleware,
-        async_default_transaction_fields_middleware,
-        async_ethereum_tester_middleware,
+        attrdict_middleware,
+        # async_buffered_gas_estimate_middleware,
+        # async_default_transaction_fields_middleware,
+        # async_ethereum_tester_middleware,
     )
 
     def __init__(self) -> None:

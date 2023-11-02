@@ -22,7 +22,6 @@ from .async_cache import (
     async_construct_simple_cache_middleware,
 )
 from .attrdict import (
-    async_attrdict_middleware,
     attrdict_middleware,
 )
 from .buffered_gas_estimate import (

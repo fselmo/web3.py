@@ -38,19 +38,10 @@ from web3.exceptions import (
 )
 from web3.method import Method
 from web3.middleware import (
-    GasPriceStrategyMiddleware,
-    abi_middleware,
-    async_attrdict_middleware,
-    async_buffered_gas_estimate_middleware,
-    async_name_to_address_middleware,
-    async_validation_middleware,
     attrdict_middleware,
-    buffered_gas_estimate_middleware,
-    name_to_address_middleware,
-    validation_middleware,
 )
-from web3.middleware.attrdict import AttributeDictMiddleware
 from web3.middleware.base import Web3Middleware
+from web3.middleware.gas_price_strategy import gas_price_strategy_middleware
 from web3.module import (
     apply_result_formatters,
 )
@@ -174,9 +165,9 @@ class RequestManager:
         Documentation should remain in sync with these defaults.
         """
         return [
-            (GasPriceStrategyMiddleware(), "gas_price_strategy"),
+            (gas_price_strategy_middleware, "gas_price_strategy"),
             # (async_name_to_address_middleware, "name_to_address"),
-            (AttributeDictMiddleware(), "attrdict"),
+            (attrdict_middleware, "attrdict"),
             # (async_validation_middleware, "validation"),
             # (async_buffered_gas_estimate_middleware, "gas_estimate"),
         ]

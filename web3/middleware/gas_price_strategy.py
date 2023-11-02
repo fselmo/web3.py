@@ -121,3 +121,6 @@ class GasPriceStrategyMiddleware(Web3Middleware):
         self, async_w3: "AsyncWeb3", response: RPCResponse
     ) -> RPCResponse:
         return response
+
+
+gas_price_strategy_middleware = GasPriceStrategyMiddleware()
