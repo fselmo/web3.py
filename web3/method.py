@@ -149,33 +149,20 @@ class Method(Generic[TFunc]):
 
     def __get__(
         self,
-        obj: Optional["Module"] = None,
+        module: Optional["Module"] = None,
         obj_type: Optional[Type["Module"]] = None,
-    ) -> TFunc:
-        if obj is None:
+    ) -> "Method":
+        self._module = module
+        return self
+
+    def __call__(self, *args: Any, batch: bool = False, **kwargs: Any) -> TFunc:
+        if self._module is None:
             raise TypeError(
                 "Direct calls to methods are not supported. "
-                "Methods must be called from an module instance, "
+                "Methods must be called from a module instance, "
                 "usually attached to a web3 instance."
             )
-
-        self._obj = obj
-        return self._get()
-
-    def _get(self, *args: Any, **kwargs: Any) -> TFunc:
-        def _inner(*args: Any, batch: bool = False) -> "Method":
-            async def _coro() -> "Method":
-                (method_str, params), response_formatters = self.process_params(
-                    self._obj, *args, **kwargs
-                )
-                return ((method_str, params), response_formatters)
-
-            if batch:
-                return _coro()
-
-            return self._obj.retrieve_caller_fn(self)(*args, **kwargs)
-
-        return _inner
+        return self._module.retrieve_caller_fn(self, batch=batch)(*args, **kwargs)
 
     @property
     def method_selector_fn(
