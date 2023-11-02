@@ -164,6 +164,9 @@ class Method(Generic[TFunc]):
             )
         return self._module.retrieve_caller_fn(self, batch=batch)(*args, **kwargs)
 
+    def __delete__(self, instance):
+        self._module = None
+
     @property
     def method_selector_fn(
         self,

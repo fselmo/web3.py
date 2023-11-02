@@ -71,7 +71,7 @@ def retrieve_blocking_method_call_fn(
             return LogFilter(eth_module=module, filter_id=err.filter_id)
 
         if batch:
-            return ((method_str, params), response_formatters)
+            return (method_str, params), response_formatters
 
         (
             result_formatters,

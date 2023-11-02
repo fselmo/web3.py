@@ -350,21 +350,29 @@ class RequestManager:
         """
         Make a batch request using the provider
         """
-        self.logger.debug(
-            f"Making batch request. Payload: {tuple(req_info[0] for req_info in requests_info)}"
-        )
-
         formatted_requests_info = []
-        for request_info in requests_info:
-            method, params = request_info[0]
-            for middleware, _name in self.middleware_onion.middlewares:
-                _w3, _method, params = middleware.process_request_params(
-                    self.w3, method, params
+        for method, params_list in requests_info.items():
+            # get the request info for each method
+            for params in params_list:
+                # process the params through the munger and request formatters
+                ((method_name, params), response_formatters) = await method(
+                    params, batch=True
                 )
-            formatted_requests_info.append(((method, params), request_info[1]))
+
+                # process the params through the middleware stack
+                for middleware, _name in self.middleware_onion.middlewares:
+                    (_, __, params) = await middleware.async_process_request_params(
+                        self.w3, method_name, params
+                    )
+
+                formatted_requests_info.append(
+                    ((method_name, params), response_formatters)
+                )
+
+        self.logger.debug(f"Making batch request. Payload: {formatted_requests_info}")
 
         responses = await self.provider.make_batch_request(formatted_requests_info)
-        matched = zip(responses, requests_info)
+        matched = zip(responses, formatted_requests_info)
         processed = []
         for resp, info in matched:
             for middleware, _name in reversed(self.middleware_onion.middlewares):
