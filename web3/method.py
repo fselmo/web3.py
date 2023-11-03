@@ -155,14 +155,14 @@ class Method(Generic[TFunc]):
         self._module = module
         return self
 
-    def __call__(self, *args: Any, batch: bool = False, **kwargs: Any) -> TFunc:
+    def __call__(self, *args: Any, **kwargs: Any) -> TFunc:
         if self._module is None:
             raise TypeError(
                 "Direct calls to methods are not supported. "
                 "Methods must be called from a module instance, "
                 "usually attached to a web3 instance."
             )
-        return self._module.retrieve_caller_fn(self, batch=batch)(*args, **kwargs)
+        return self._module.retrieve_caller_fn(self)(*args, **kwargs)
 
     def __delete__(self, instance):
         self._module = None

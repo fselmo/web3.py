@@ -135,8 +135,10 @@ class HTTPProvider(JSONBaseProvider):
     ) -> Tuple[RPCResponse, ...]:
         requests = [request_info[0] for request_info in batch_requests]
         request_data: bytes = self.encode_batch_rpc_request(requests)
+        self.logger.debug(f"Making batch request HTTP. Payload: {requests}")
         raw_response = make_post_request(
             self.endpoint_uri, request_data, **self.get_request_kwargs()
         )
+        self.logger.debug("Received batch response HTTP.")
         responses = self.decode_batch_rpc_response(raw_response)
         return responses

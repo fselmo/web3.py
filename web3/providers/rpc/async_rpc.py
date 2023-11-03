@@ -148,8 +148,10 @@ class AsyncHTTPProvider(AsyncJSONBaseProvider):
     ) -> List[RPCResponse]:
         requests = [request_info[0] for request_info in requests_info]
         request_data: bytes = self.encode_batch_rpc_request(requests)
+        self.logger.debug(f"Making batch request HTTP. Payload: {requests}")
         raw_response: bytes = await async_make_post_request(
             self.endpoint_uri, request_data, **self.get_request_kwargs()
         )
+        self.logger.debug("Received batch response HTTP.")
         response: List[RPCResponse] = self.decode_batch_rpc_response(raw_response)
         return response

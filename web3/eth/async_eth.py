@@ -254,7 +254,6 @@ class AsyncEth(BaseEth):
         block_identifier: Optional[BlockIdentifier] = None,
         state_override: Optional[CallOverride] = None,
         ccip_read_enabled: Optional[bool] = None,
-        **kwargs: Any,
     ) -> HexBytes:
         ccip_read_enabled_on_provider = self.w3.provider.global_ccip_read_enabled
         if (
@@ -266,18 +265,15 @@ class AsyncEth(BaseEth):
             or not ccip_read_enabled_on_provider
             and ccip_read_enabled is True
         ):
-            return await self._durin_call(
-                transaction, block_identifier, state_override, **kwargs
-            )
+            return await self._durin_call(transaction, block_identifier, state_override)
 
-        return await self._call(transaction, block_identifier, state_override, **kwargs)
+        return await self._call(transaction, block_identifier, state_override)
 
     async def _durin_call(
         self,
         transaction: TxParams,
         block_identifier: Optional[BlockIdentifier] = None,
         state_override: Optional[CallOverride] = None,
-        **kwargs: Any,
     ) -> HexBytes:
         max_redirects = self.w3.provider.ccip_read_max_redirects
 
@@ -288,9 +284,7 @@ class AsyncEth(BaseEth):
 
         for _ in range(max_redirects):
             try:
-                return await self._call(
-                    transaction, block_identifier, state_override, **kwargs
-                )
+                return await self._call(transaction, block_identifier, state_override)
             except OffchainLookup as offchain_lookup:
                 durin_calldata = await async_handle_offchain_lookup(
                     offchain_lookup.payload,
@@ -417,12 +411,9 @@ class AsyncEth(BaseEth):
     )
 
     async def get_block(
-        self,
-        block_identifier: BlockIdentifier,
-        full_transactions: bool = False,
-        **kwargs: Any,
+        self, block_identifier: BlockIdentifier, full_transactions: bool = False
     ) -> BlockData:
-        return await self._get_block(block_identifier, full_transactions, **kwargs)
+        return await self._get_block(block_identifier, full_transactions)
 
     # eth_getBalance
 
@@ -440,9 +431,8 @@ class AsyncEth(BaseEth):
         self,
         account: Union[Address, ChecksumAddress, ENS],
         block_identifier: Optional[BlockIdentifier] = None,
-        **kwargs: Any,
     ) -> Wei:
-        return await self._get_balance(account, block_identifier, **kwargs)
+        return await self._get_balance(account, block_identifier)
 
     # eth_getCode
 

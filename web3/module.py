@@ -60,7 +60,6 @@ def retrieve_blocking_method_call_fn(
     w3: "Web3",
     module: "Module",
     method: Method[Callable[..., TReturn]],
-    batch: bool = False,
 ) -> Callable[..., Union[TReturn, LogFilter]]:
     def caller(*args: Any, **kwargs: Any) -> Union[TReturn, LogFilter]:
         try:
@@ -70,7 +69,7 @@ def retrieve_blocking_method_call_fn(
         except _UseExistingFilter as err:
             return LogFilter(eth_module=module, filter_id=err.filter_id)
 
-        if batch:
+        if w3._request_lock:
             return (method_str, params), response_formatters
 
         (
@@ -91,7 +90,6 @@ def retrieve_async_method_call_fn(
     async_w3: "AsyncWeb3",
     module: "Module",
     method: Method[Callable[..., Any]],
-    batch: bool = False,
 ) -> Callable[..., Coroutine[Any, Any, Optional[Union[RPCResponse, AsyncLogFilter]]]]:
     async def caller(*args: Any, **kwargs: Any) -> Union[RPCResponse, AsyncLogFilter]:
         try:
@@ -109,7 +107,7 @@ def retrieve_async_method_call_fn(
                 method_str, params, response_formatters  # type: ignore
             )
 
-            if batch:
+            if async_w3._request_lock:
                 return ((method_str, params), response_formatters)
 
             try:
@@ -122,7 +120,7 @@ def retrieve_async_method_call_fn(
                     )
                 raise e
         else:
-            if batch:
+            if async_w3._request_lock:
                 return ((method_str, params), response_formatters)
 
             (

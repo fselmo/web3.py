@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -23,6 +24,7 @@ from websockets.exceptions import (
     ConnectionClosedOK,
 )
 
+from web3._utils.batching import BatchRequestContextManager
 from web3._utils.caching import (
     generate_cache_key,
 )
@@ -360,8 +362,6 @@ class RequestManager:
                     ((method_name, params), response_formatters)
                 )
 
-        self.logger.debug(f"Making batch request. Payload: {formatted_requests_info}")
-
         responses = self.provider.make_batch_request(formatted_requests_info)
         matched = zip(responses, formatted_requests_info)
         processed = []
@@ -391,32 +391,27 @@ class RequestManager:
 
         return formatted
 
+    def batch_requests(self) -> BatchRequestContextManager:
+        """
+        Context manager for making batch requests
+        """
+        return BatchRequestContextManager(self.w3)
+
     async def async_make_batch_request(self, requests_info) -> List[RPCResponse]:
         """
         Make a batch request using the provider
         """
         formatted_requests_info = []
-        for method, params_list in requests_info.items():
-            # get the request info for each method
-            for params in params_list:
-                # process the params through the munger and request formatters
-                ((method_name, params), response_formatters) = await method(
-                    params, batch=True
+        for (method_name, params), response_formatters in requests_info:
+            # process the params through the middleware stack
+            for middleware, _name in self.middleware_onion.middlewares:
+                (_, __, params) = await middleware.async_process_request_params(
+                    self.w3, method_name, params
                 )
 
-                # process the params through the middleware stack
-                for middleware, _name in self.middleware_onion.middlewares:
-                    (_, __, params) = await middleware.async_process_request_params(
-                        self.w3, method_name, params
-                    )
+            formatted_requests_info.append(((method_name, params), response_formatters))
 
-                formatted_requests_info.append(
-                    ((method_name, params), response_formatters)
-                )
-
-        self.logger.debug(f"Making batch request. Payload: {formatted_requests_info}")
         responses = await self.provider.make_batch_request(formatted_requests_info)
-        self.logger.debug(f"Received batch response.")
 
         matched = zip(responses, formatted_requests_info)
         processed = []
