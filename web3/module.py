@@ -108,6 +108,10 @@ def retrieve_async_method_call_fn(
             cache_key = provider._request_processor.cache_request_information(
                 method_str, params, response_formatters  # type: ignore
             )
+
+            if batch:
+                return ((method_str, params), response_formatters)
+
             try:
                 method_str = cast(RPCEndpoint, method_str)
                 return await async_w3.manager.ws_send(method_str, params)

@@ -236,3 +236,93 @@ class WebsocketProviderV2(PersistentConnectionProvider):
 
     async def _ws_recv(self, timeout: float = None) -> RPCResponse:
         return json.loads(await asyncio.wait_for(self._ws.recv(), timeout=timeout))
+
+    # --- batching -- #
+
+    # TODO: implement the caching and retrieval of batched responses as a new "type"
+    #  of response in the request processor. This will allow the batched responses to
+    #  be cached and retrieved in the same way as non-batched responses.
+
+    # async def _get_batched_response(self, request_ids) -> RPCResponse:
+    #     async def _get_batched_response_with_matching_ids() -> RPCResponse:
+    #         # request_cache_key = generate_cache_key(request_id)
+    #
+    #         while True:
+    #             # sleep(0) here seems to be the most efficient way to yield control
+    #             # back to the event loop while waiting for the response to be cached
+    #             # or received on the websocket.
+    #             await asyncio.sleep(0)
+    #
+    #             if request_cache_key in self._request_processor._request_response_cache:
+    #                 # if response is already cached, pop it from cache
+    #                 self.logger.debug(
+    #                     f"Response for id {request_id} is already cached, pop it "
+    #                     "from the cache."
+    #                 )
+    #                 return self._request_processor.pop_raw_response(
+    #                     cache_key=request_cache_key,
+    #                 )
+    #
+    #             else:
+    #                 if not self._ws_lock.locked():
+    #                     async with self._ws_lock:
+    #                         self.logger.debug(
+    #                             f"Response for id {request_id} is not cached, calling "
+    #                             "`recv()` on websocket."
+    #                         )
+    #                         try:
+    #                             # keep timeout low but reasonable to check both the
+    #                             # cache and the websocket connection for new responses
+    #                             response = await self._ws_recv(timeout=0.5)
+    #                         except asyncio.TimeoutError:
+    #                             # keep the request timeout around the whole of this
+    #                             # while loop in case the response sneaks into the cache
+    #                             # from another call.
+    #                             continue
+    #
+    #                     response_id = response.get("id")
+    #
+    #                     if response_id == request_id:
+    #                         self.logger.debug(
+    #                             f"Received and returning response for id {request_id}."
+    #                         )
+    #                         return response
+    #                     else:
+    #                         # cache all responses that are not the desired response
+    #                         self.logger.debug("Undesired response received, caching.")
+    #                         is_subscription = (
+    #                             response.get("method") == "eth_subscription"
+    #                         )
+    #                         self._request_processor.cache_raw_response(
+    #                             response, subscription=is_subscription
+    #                         )
+    #
+    #     try:
+    #         # Add the request timeout around the while loop that checks the request
+    #         # cache and tried to recv(). If the request is neither in the cache, nor
+    #         # received within the request_timeout, raise ``TimeExhausted``.
+    #         return await asyncio.wait_for(
+    #             _match_response_id_to_request_id(), self.request_timeout
+    #         )
+    #     except asyncio.TimeoutError:
+    #         raise TimeExhausted(
+    #             f"Timed out waiting for response with request id `{request_id}` after "
+    #             f"{self.request_timeout} second(s). This may be due to the provider "
+    #             "not returning a response with the same id that was sent in the "
+    #             "request or an exception raised during the request was caught and "
+    #             "allowed to continue."
+    #         )
+
+    async def make_batch_request(self, batch_requests):
+        requests = [request_info[0] for request_info in batch_requests]
+        request_data: bytes = self.encode_batch_rpc_request(requests)
+        # request_ids = [json.loads(request).get("id") for request in request_data]
+        # TODO: This is a very naive implementation of batching and only works if we
+        #  are testing batch by itself at the moment. If we try to run this with any
+        #  listener / subscription, the listener may receive the response first.
+        await asyncio.wait_for(
+            self._ws.send(request_data), timeout=self.request_timeout
+        )
+        raw_response = await self._ws.recv()
+        response = self.decode_batch_rpc_response(raw_response)
+        return response

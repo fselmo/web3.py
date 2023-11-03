@@ -415,8 +415,9 @@ class RequestManager:
                 )
 
         self.logger.debug(f"Making batch request. Payload: {formatted_requests_info}")
-
         responses = await self.provider.make_batch_request(formatted_requests_info)
+        self.logger.debug(f"Received batch response.")
+
         matched = zip(responses, formatted_requests_info)
         processed = []
         for resp, info in matched:
@@ -447,16 +448,11 @@ class RequestManager:
 
     # persistent connection
     async def ws_send(self, method: RPCEndpoint, params: Any) -> RPCResponse:
-        provider = cast(PersistentConnectionProvider, self._provider)
-        request_func = await provider.request_func(
-            cast("AsyncWeb3", self.w3),
-            cast(AsyncMiddlewareOnion, self.middleware_onion),
-        )
         self.logger.debug(
             "Making request to open websocket connection - "
-            f"uri: {provider.endpoint_uri}, method: {method}"
+            f"uri: {self.provider.endpoint_uri}, method: {method}"
         )
-        response = await request_func(method, params)
+        response = await self.provider.make_request(method, params)
         return await self._process_ws_response(response)
 
     async def ws_recv(self) -> Any:

@@ -254,6 +254,7 @@ class AsyncEth(BaseEth):
         block_identifier: Optional[BlockIdentifier] = None,
         state_override: Optional[CallOverride] = None,
         ccip_read_enabled: Optional[bool] = None,
+        **kwargs: Any,
     ) -> HexBytes:
         ccip_read_enabled_on_provider = self.w3.provider.global_ccip_read_enabled
         if (
@@ -265,15 +266,18 @@ class AsyncEth(BaseEth):
             or not ccip_read_enabled_on_provider
             and ccip_read_enabled is True
         ):
-            return await self._durin_call(transaction, block_identifier, state_override)
+            return await self._durin_call(
+                transaction, block_identifier, state_override, **kwargs
+            )
 
-        return await self._call(transaction, block_identifier, state_override)
+        return await self._call(transaction, block_identifier, state_override, **kwargs)
 
     async def _durin_call(
         self,
         transaction: TxParams,
         block_identifier: Optional[BlockIdentifier] = None,
         state_override: Optional[CallOverride] = None,
+        **kwargs: Any,
     ) -> HexBytes:
         max_redirects = self.w3.provider.ccip_read_max_redirects
 
@@ -284,7 +288,9 @@ class AsyncEth(BaseEth):
 
         for _ in range(max_redirects):
             try:
-                return await self._call(transaction, block_identifier, state_override)
+                return await self._call(
+                    transaction, block_identifier, state_override, **kwargs
+                )
             except OffchainLookup as offchain_lookup:
                 durin_calldata = await async_handle_offchain_lookup(
                     offchain_lookup.payload,
