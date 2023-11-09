@@ -1,6 +1,7 @@
-from abc import abstractmethod
-from typing import Any, TYPE_CHECKING
-
+from typing import (
+    TYPE_CHECKING,
+    Any,
+)
 
 if TYPE_CHECKING:
     from web3 import (
@@ -14,26 +15,32 @@ if TYPE_CHECKING:
 
 
 class Web3Middleware:
-    @abstractmethod
-    def process_request_params(
-        self, w3: "Web3", method: "RPCEndpoint", params: Any
-    ) -> Any:
-        raise NotImplementedError("Must be implemented by subclasses")
+    @classmethod
+    def request_processor(cls, w3: "Web3", method: "RPCEndpoint", params: Any) -> Any:
+        return params
 
-    @abstractmethod
-    def process_response(self, response: "RPCResponse") -> "RPCResponse":
-        raise NotImplementedError("Must be implemented by subclasses")
+    @classmethod
+    def response_processor(
+        cls, w3: "Web3", method: "RPCEndpoint", response: "RPCResponse"
+    ) -> "RPCResponse":
+        return response
 
     # -- async -- #
 
-    @abstractmethod
-    async def async_process_request_params(
-        self, async_w3: "AsyncWeb3", method: "RPCEndpoint", params: Any
+    @classmethod
+    async def async_request_processor(
+        cls,
+        async_w3: "AsyncWeb3",
+        method: "RPCEndpoint",
+        params: Any,
     ) -> Any:
-        raise NotImplementedError("Must be implemented by subclasses")
+        return params
 
-    @abstractmethod
-    async def async_process_response(
-        self, async_w3: "AsyncWeb3", response: "RPCResponse"
+    @classmethod
+    async def async_response_processor(
+        cls,
+        async_w3: "AsyncWeb3",
+        method: "RPCEndpoint",
+        response: "RPCResponse",
     ) -> "RPCResponse":
-        raise NotImplementedError("Must be implemented by subclasses")
+        return response

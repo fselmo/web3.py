@@ -40,12 +40,7 @@ from web3._utils.formatters import (
 from web3._utils.method_formatters import (
     apply_list_to_array_formatter,
 )
-from web3.middleware import (
-    construct_formatting_middleware,
-)
-from web3.middleware.formatting import (
-    async_construct_formatting_middleware,
-)
+from web3.middleware.formatting import FormattingMiddleware
 from web3.types import (
     AsyncMiddlewareCoroutine,
     Middleware,
@@ -312,7 +307,7 @@ result_formatters: Optional[Dict[RPCEndpoint, Callable[..., Any]]] = {
 }
 
 
-ethereum_tester_middleware = construct_formatting_middleware(
+ethereum_tester_middleware = FormattingMiddleware(
     request_formatters=request_formatters, result_formatters=result_formatters
 )
 
@@ -365,10 +360,10 @@ def default_transaction_fields_middleware(
 async def async_ethereum_tester_middleware(  # type: ignore
     make_request, web3: "AsyncWeb3"
 ) -> Middleware:
-    middleware = await async_construct_formatting_middleware(
+    middleware = FormattingMiddleware(
         request_formatters=request_formatters, result_formatters=result_formatters
     )
-    return await middleware(make_request, web3)
+    return middleware
 
 
 async def async_guess_from(

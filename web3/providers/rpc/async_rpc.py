@@ -59,7 +59,7 @@ class AsyncHTTPProvider(AsyncJSONBaseProvider):
     endpoint_uri = None
     _request_kwargs = None
     # type ignored b/c conflict with _middlewares attr on AsyncBaseProvider
-    _middlewares: Tuple[AsyncMiddleware, ...] = NamedElementOnion([])  # type: ignore
+    _middlewares: Tuple[AsyncMiddleware, ...] = NamedElementOnion([])  # type: ignore # noqa: E501
 
     def __init__(
         self,

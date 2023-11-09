@@ -155,7 +155,7 @@ class Method(Generic[TFunc]):
         self._module = module
         return self
 
-    def __call__(self, *args: Any, **kwargs: Any) -> TFunc:
+    def __call__(self, *args: Any, _batch_call: bool = False, **kwargs: Any) -> TFunc:
         if self._module is None:
             raise TypeError(
                 "Direct calls to methods are not supported. "

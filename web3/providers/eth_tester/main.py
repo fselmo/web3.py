@@ -24,7 +24,7 @@ from web3.middleware.attrdict import (
     attrdict_middleware,
 )
 from web3.middleware.buffered_gas_estimate import (
-    async_buffered_gas_estimate_middleware,
+    buffered_gas_estimate_middleware,
 )
 from web3.providers import (
     BaseProvider,
@@ -53,7 +53,7 @@ if TYPE_CHECKING:
 class AsyncEthereumTesterProvider(AsyncBaseProvider):
     middlewares = (
         attrdict_middleware,
-        # async_buffered_gas_estimate_middleware,
+        buffered_gas_estimate_middleware,
         # async_default_transaction_fields_middleware,
         # async_ethereum_tester_middleware,
     )

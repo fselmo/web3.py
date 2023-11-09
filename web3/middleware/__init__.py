@@ -1,6 +1,7 @@
 import functools
 from typing import (
     Coroutine,
+    Literal,
     TYPE_CHECKING,
     Any,
     Callable,
@@ -9,7 +10,6 @@ from typing import (
 
 from web3.types import (
     AsyncMiddleware,
-    Middleware,
     RPCEndpoint,
     RPCResponse,
 )
@@ -24,8 +24,10 @@ from .async_cache import (
 from .attrdict import (
     attrdict_middleware,
 )
+from .base import (
+    Web3Middleware,
+)
 from .buffered_gas_estimate import (
-    async_buffered_gas_estimate_middleware,
     buffered_gas_estimate_middleware,
 )
 from .cache import (
@@ -36,8 +38,14 @@ from .cache import (
     construct_simple_cache_middleware,
     construct_time_based_cache_middleware,
 )
+from .gas_price_strategy import (
+    gas_price_strategy_middleware,
+)
 from .exception_handling import (
     construct_exception_handler_middleware,
+)
+from .names import (
+    ens_name_to_address_middleware,
 )
 from .filter import (
     async_local_filter_middleware,
@@ -50,19 +58,8 @@ from .fixture import (
     construct_fixture_middleware,
     construct_result_generator_middleware,
 )
-from .formatting import (
-    construct_formatting_middleware,
-)
 from .gas_price_strategy import (
     GasPriceStrategyMiddleware,
-)
-from .geth_poa import (
-    async_geth_poa_middleware,
-    geth_poa_middleware,
-)
-from .names import (
-    async_name_to_address_middleware,
-    name_to_address_middleware,
 )
 from .normalize_request_parameters import (
     request_parameter_normalizer,
@@ -74,11 +71,9 @@ from .signing import (
     construct_sign_and_send_raw_middleware,
 )
 from .stalecheck import (
-    async_make_stalecheck_middleware,
-    make_stalecheck_middleware,
+    StaleCheckMiddleware,
 )
 from .validation import (
-    async_validation_middleware,
     validation_middleware,
 )
 
@@ -87,41 +82,56 @@ if TYPE_CHECKING:
 
 
 def combine_middlewares(
-    middlewares: Sequence[Middleware],
+    middlewares: Sequence[Web3Middleware],
     w3: "Web3",
     provider_request_fn: Callable[[RPCEndpoint, Any], Any],
 ) -> Callable[..., RPCResponse]:
     """
-    Returns a callable function which will call the provider.provider_request
-    function wrapped with all of the middlewares.
+    Returns a callable function which takes method and params as positional arguments
+    and passes these args through the request processors, makes the request, and passes
+    the response through the response processors.
     """
-    return functools.reduce(
-        lambda request_fn, middleware: middleware(request_fn, w3),
-        reversed(middlewares),
-        provider_request_fn,
+    request_processors = [middleware.request_processor for middleware in middlewares]
+    response_processors = [
+        middleware.response_processor for middleware in reversed(middlewares)
+    ]
+    return lambda method, params_or_response: functools.reduce(
+        lambda p_o_r, processor: processor(w3, method, p_o_r),
+        response_processors,
+        provider_request_fn(
+            method,
+            functools.reduce(
+                lambda p, processor: processor(w3, method, p),
+                request_processors,
+                params_or_response,
+            ),
+        ),
     )
 
 
 async def async_combine_middlewares(
-    middlewares: Sequence[AsyncMiddleware],
+    middlewares: Sequence[Web3Middleware],
     async_w3: "AsyncWeb3",
     provider_request_fn: Callable[[RPCEndpoint, Any], Any],
 ) -> Callable[..., Coroutine[Any, Any, RPCResponse]]:
     """
-    Returns a callable function which will call the provider.provider_request
-    function wrapped with all of the middlewares.
+    Returns a callable function which takes method and params as positional arguments
+    and passes these args through the request processors, makes the request, and passes
+    the response through the response processors.
     """
-    accumulator_fn = provider_request_fn
-    for middleware in reversed(middlewares):
-        accumulator_fn = await construct_middleware(
-            middleware, accumulator_fn, async_w3
-        )
-    return accumulator_fn
+    async_request_processors = [
+        middleware.async_request_processor for middleware in middlewares
+    ]
+    async_response_processors = [
+        middleware.async_response_processor for middleware in reversed(middlewares)
+    ]
 
+    async def async_request_fn(method: RPCEndpoint, params: Any) -> RPCResponse:
+        for processor in async_request_processors:
+            params = await processor(async_w3, method, params)
+        response = await provider_request_fn(method, params)
+        for processor in async_response_processors:
+            response = await processor(async_w3, method, response)
+        return response
 
-async def construct_middleware(
-    async_middleware: AsyncMiddleware,
-    fn: Callable[..., RPCResponse],
-    async_w3: "AsyncWeb3",
-) -> Callable[[RPCEndpoint, Any], RPCResponse]:
-    return await async_middleware(fn, async_w3)
+    return async_request_fn

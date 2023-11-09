@@ -1,8 +1,5 @@
 from typing import (
     TYPE_CHECKING,
-    Any,
-    Callable,
-    Optional,
     cast,
 )
 
@@ -15,7 +12,6 @@ from web3.datastructures import (
 )
 from web3.middleware.base import Web3Middleware
 from web3.types import (
-    AsyncMiddlewareCoroutine,
     RPCEndpoint,
     RPCResponse,
 )
@@ -38,12 +34,9 @@ class AttributeDictMiddleware(Web3Middleware):
         (e.g. my_attribute_dict.property1) will not preserve typing.
     """
 
-    def process_request_params(
-        self, w3: "Web3", method: RPCEndpoint, params: Any
-    ) -> Any:
-        return (w3, method, params)
-
-    def process_response(self, response: RPCResponse) -> RPCResponse:
+    def response_processor(
+        self, w3: "Web3", method: "RPCEndpoint", response: RPCResponse
+    ) -> RPCResponse:
         if "result" in response:
             return assoc(
                 response, "result", AttributeDict.recursive(response["result"])
@@ -53,13 +46,8 @@ class AttributeDictMiddleware(Web3Middleware):
 
     # -- async -- #
 
-    async def async_process_request_params(
-        self, async_w3: "AsyncWeb3", method: RPCEndpoint, params: Any
-    ) -> Any:
-        return (async_w3, method, params)
-
-    async def async_process_response(
-        self, async_w3: "AsyncWeb3", response: "RPCResponse"
+    async def async_response_processor(
+        self, async_w3: "AsyncWeb3", method: "RPCEndpoint", response: "RPCResponse"
     ) -> "RPCResponse":
         if async_w3.provider.has_persistent_connection:
             # asynchronous response processing
@@ -73,56 +61,6 @@ class AttributeDictMiddleware(Web3Middleware):
 
 
 attrdict_middleware = AttributeDictMiddleware()
-
-# def attrdict_middleware(
-#     make_request: Callable[[RPCEndpoint, Any], Any], _w3: "Web3"
-# ) -> Callable[[RPCEndpoint, Any], RPCResponse]:
-#     """
-#     Converts any result which is a dictionary into an `AttributeDict`.
-#
-#     Note: Accessing `AttributeDict` properties via attribute
-#         (e.g. my_attribute_dict.property1) will not preserve typing.
-#     """
-#
-#     def middleware(method: RPCEndpoint, params: Any) -> RPCResponse:
-#         response = make_request(method, params)
-#
-#         if "result" in response:
-#             return assoc(
-#                 response, "result", AttributeDict.recursive(response["result"])
-#             )
-#         else:
-#             return response
-#
-#     return middleware
-#
-#
-# # --- async --- #
-#
-#
-# async def async_attrdict_middleware(
-#     make_request: Callable[[RPCEndpoint, Any], Any], async_w3: "AsyncWeb3"
-# ) -> AsyncMiddlewareCoroutine:
-#     """
-#     Converts any result which is a dictionary into an `AttributeDict`.
-#
-#     Note: Accessing `AttributeDict` properties via attribute
-#         (e.g. my_attribute_dict.property1) will not preserve typing.
-#     """
-#
-#     async def middleware(method: RPCEndpoint, params: Any) -> Optional[RPCResponse]:
-#         response = await make_request(method, params)
-#         if async_w3.provider.has_persistent_connection:
-#             # asynchronous response processing
-#             provider = cast("PersistentConnectionProvider", async_w3.provider)
-#             provider._request_processor.append_middleware_response_processor(
-#                 _handle_async_response
-#             )
-#             return response
-#         else:
-#             return _handle_async_response(response)
-#
-#     return middleware
 
 
 def _handle_async_response(response: RPCResponse) -> RPCResponse:

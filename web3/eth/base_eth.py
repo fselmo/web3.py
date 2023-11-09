@@ -111,6 +111,7 @@ class BaseEth(Module):
         self,
         block_identifier: BlockIdentifier,
         full_transactions: bool = False,
+        **kwargs: Any,
     ) -> Tuple[BlockIdentifier, bool]:
         return (block_identifier, full_transactions)
 

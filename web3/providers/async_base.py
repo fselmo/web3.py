@@ -46,13 +46,6 @@ if TYPE_CHECKING:
 
 class AsyncBaseProvider:
     _middlewares: Tuple[Web3Middleware, ...] = ()
-    # a tuple of (all_middlewares, request_func)
-    _request_func_cache: Tuple[
-        Tuple[AsyncMiddleware, ...], Callable[..., Coroutine[Any, Any, RPCResponse]]
-    ] = (
-        None,
-        None,
-    )
 
     is_async = True
     has_persistent_connection = False
@@ -67,6 +60,17 @@ class AsyncBaseProvider:
     def middlewares(self, values: MiddlewareOnion) -> None:
         # tuple(values) converts to MiddlewareOnion -> Tuple[Middleware, ...]
         self._middlewares = tuple(values)  # type: ignore
+
+    async def request_func(
+        self, async_w3: "AsyncWeb3", outer_middlewares: AsyncMiddlewareOnion
+    ) -> Callable[..., Coroutine[Any, Any, RPCResponse]]:
+        # type ignored b/c tuple(MiddlewareOnion) converts to tuple of middlewares
+        all_middlewares: Tuple[Web3Middleware] = tuple(outer_middlewares) + tuple(self.middlewares)  # type: ignore  # noqa: E501
+        return await async_combine_middlewares(
+            middlewares=all_middlewares,
+            async_w3=async_w3,
+            provider_request_fn=self.make_request,
+        )
 
     async def make_request(self, method: RPCEndpoint, params: Any) -> RPCResponse:
         raise NotImplementedError("Providers must implement this method")

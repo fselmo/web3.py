@@ -21,6 +21,7 @@ from web3.exceptions import (
     ProviderConnectionError,
 )
 from web3.middleware import (
+    Web3Middleware,
     combine_middlewares,
 )
 from web3.types import (
@@ -36,11 +37,6 @@ if TYPE_CHECKING:
 
 class BaseProvider:
     _middlewares: Tuple[Middleware, ...] = ()
-    # a tuple of (all_middlewares, request_func)
-    _request_func_cache: Tuple[Tuple[Middleware, ...], Callable[..., RPCResponse]] = (
-        None,
-        None,
-    )
 
     is_async = False
     has_persistent_connection = False
@@ -56,12 +52,25 @@ class BaseProvider:
         # tuple(values) converts to MiddlewareOnion -> Tuple[Middleware, ...]
         self._middlewares = tuple(values)  # type: ignore
 
-    def make_request(self, method: RPCEndpoint, params: Any) -> RPCResponse:
-        raise NotImplementedError("Providers must implement this method")
+    def request_func(
+        self, w3: "Web3", outer_middlewares: MiddlewareOnion
+    ) -> Callable[..., RPCResponse]:
+        """
+        @param w3 is the web3 instance
+        @param outer_middlewares is an iterable of middlewares,
+            ordered by first to execute
+        @returns a function that calls all the middleware and
+            eventually self.make_request()
+        """
+        # type ignored b/c tuple(MiddlewareOnion) converts to tuple of middlewares
+        all_middlewares: Tuple[Web3Middleware] = tuple(outer_middlewares) + tuple(self.middlewares)  # type: ignore # noqa: E501
+        return combine_middlewares(
+            middlewares=all_middlewares,
+            w3=w3,
+            provider_request_fn=self.make_request,
+        )
 
-    def make_batch_request(
-        self, requests: Sequence[Tuple[RPCEndpoint, Any]]
-    ) -> Sequence[RPCResponse]:
+    def make_request(self, method: RPCEndpoint, params: Any) -> RPCResponse:
         raise NotImplementedError("Providers must implement this method")
 
     def is_connected(self, show_traceback: bool = False) -> bool:
@@ -111,6 +120,11 @@ class JSONBaseProvider(BaseProvider):
             return False
 
     #  -- batch requests -- #
+
+    def make_batch_request(
+        self, requests: Sequence[Tuple[RPCEndpoint, Any]]
+    ) -> Sequence[RPCResponse]:
+        raise NotImplementedError("Providers must implement this method")
 
     def encode_batch_rpc_request(
         self, requests: Sequence[Tuple[RPCEndpoint, Any]]

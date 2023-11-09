@@ -90,6 +90,7 @@ def retrieve_async_method_call_fn(
     async_w3: "AsyncWeb3",
     module: "Module",
     method: Method[Callable[..., Any]],
+    _batch_call: bool = False,
 ) -> Callable[..., Coroutine[Any, Any, Optional[Union[RPCResponse, AsyncLogFilter]]]]:
     async def caller(*args: Any, **kwargs: Any) -> Union[RPCResponse, AsyncLogFilter]:
         try:
@@ -107,7 +108,7 @@ def retrieve_async_method_call_fn(
                 method_str, params, response_formatters  # type: ignore
             )
 
-            if async_w3._request_lock:
+            if _batch_call:
                 return ((method_str, params), response_formatters)
 
             try:
@@ -120,7 +121,7 @@ def retrieve_async_method_call_fn(
                     )
                 raise e
         else:
-            if async_w3._request_lock:
+            if _batch_call:
                 return ((method_str, params), response_formatters)
 
             (

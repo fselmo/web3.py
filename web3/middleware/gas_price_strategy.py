@@ -86,9 +86,7 @@ class GasPriceStrategyMiddleware(Web3Middleware):
     - Validates transaction params against legacy and dynamic fee txn values.
     """
 
-    def process_request_params(
-        self, w3: "Web3", method: RPCEndpoint, params: Any
-    ) -> Any:
+    def request_processor(self, w3: "Web3", method: RPCEndpoint, params: Any) -> Any:
         if method == "eth_sendTransaction":
             transaction = params[0]
             generated_gas_price = w3.eth.generate_gas_price(transaction)
@@ -96,15 +94,13 @@ class GasPriceStrategyMiddleware(Web3Middleware):
             transaction = validate_transaction_params(
                 transaction, latest_block, generated_gas_price
             )
-            return (w3, method, (transaction,))
-        return (w3, method, params)
+            params = (transaction,)
 
-    def process_response(self, response: RPCResponse) -> RPCResponse:
-        return response
+        return params
 
     # -- async -- #
 
-    async def async_process_request_params(
+    async def async_request_processor(
         self, async_w3: "AsyncWeb3", method: RPCEndpoint, params: Any
     ) -> Any:
         if method == "eth_sendTransaction":
@@ -114,13 +110,8 @@ class GasPriceStrategyMiddleware(Web3Middleware):
             transaction = validate_transaction_params(
                 transaction, latest_block, generated_gas_price
             )
-            return (async_w3, method, (transaction,))
-        return (async_w3, method, params)
-
-    async def async_process_response(
-        self, async_w3: "AsyncWeb3", response: RPCResponse
-    ) -> RPCResponse:
-        return response
+            params = (transaction,)
+        return params
 
 
 gas_price_strategy_middleware = GasPriceStrategyMiddleware()

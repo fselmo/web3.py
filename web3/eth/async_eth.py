@@ -411,9 +411,12 @@ class AsyncEth(BaseEth):
     )
 
     async def get_block(
-        self, block_identifier: BlockIdentifier, full_transactions: bool = False
+        self,
+        block_identifier: BlockIdentifier,
+        full_transactions: bool = False,
+        **kwargs: Any,
     ) -> BlockData:
-        return await self._get_block(block_identifier, full_transactions)
+        return await self._get_block(block_identifier, full_transactions, **kwargs)
 
     # eth_getBalance
 
@@ -431,8 +434,9 @@ class AsyncEth(BaseEth):
         self,
         account: Union[Address, ChecksumAddress, ENS],
         block_identifier: Optional[BlockIdentifier] = None,
+        **kwargs: Any,
     ) -> Wei:
-        return await self._get_balance(account, block_identifier)
+        return await self._get_balance(account, block_identifier, **kwargs)
 
     # eth_getCode
 
