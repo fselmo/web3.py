@@ -5,8 +5,11 @@ import os
 from typing import (
     Any,
     Dict,
+    List,
     Optional,
+    Tuple,
     Union,
+    cast,
 )
 
 from eth_typing import (
@@ -176,6 +179,25 @@ class WebSocketProvider(PersistentConnectionProvider):
 
         return response
 
+    async def make_batch_request(
+        self, requests: List[Tuple[RPCEndpoint, Any]]
+    ) -> List[RPCResponse]:
+        request_data = self.encode_batch_rpc_request(requests)
+
+        if self._ws is None:
+            raise ProviderConnectionError(
+                "Connection to websocket has not been initiated for the provider."
+            )
+
+        await asyncio.wait_for(
+            self._ws.send(request_data), timeout=self.request_timeout
+        )
+
+        # generate a cache key with all the request ids hashed
+        request_ids = [rpc_request["id"] for rpc_request in json.loads(request_data)]
+        response = await self._get_response_for_request_id(request_ids)
+        return cast(List[RPCResponse], response)
+
     async def _message_listener(self) -> None:
         self.logger.info(
             "WebSocket listener background task started. Storing all messages in "
@@ -191,7 +213,11 @@ class WebSocketProvider(PersistentConnectionProvider):
                     await asyncio.sleep(0)
 
                     response = json.loads(raw_message)
-                    subscription = response.get("method") == "eth_subscription"
+                    subscription = (
+                        response.get("method") == "eth_subscription"
+                        if not isinstance(response, list)
+                        else False
+                    )
                     await self._request_processor.cache_raw_response(
                         response, subscription=subscription
                     )
