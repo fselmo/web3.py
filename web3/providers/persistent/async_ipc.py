@@ -198,8 +198,7 @@ class AsyncIPCProvider(PersistentConnectionProvider):
         response = cast(
             List[RPCResponse], await self._get_response_for_request_id(request_ids)
         )
-        # sort by response `id` since the JSON-RPC 2.0 spec doesn't guarantee order
-        return sorted(response, key=lambda resp: int(resp["id"]))
+        return response
 
     async def _message_listener(self) -> None:
         self.logger.info(
@@ -222,6 +221,13 @@ class AsyncIPCProvider(PersistentConnectionProvider):
                         response, pos = decoder.raw_decode(raw_message)
                     except JSONDecodeError:
                         break
+
+                    if isinstance(response, list):
+                        # Order responses to batch requests by `id` since the
+                        # JSON-RPC 2.0 spec doesn't guarantee order. It's important
+                        # to do this before caching since we generate and look for
+                        # cache keys using the ordered request ids.
+                        response = sorted(response, key=lambda resp: int(resp["id"]))
 
                     is_subscription = (
                         response.get("method") == "eth_subscription"
