@@ -147,7 +147,7 @@ from web3.types import (
 )
 
 if TYPE_CHECKING:
-    from web3._utils.batching import BatchRequestContextManager  # noqa: F401
+    from web3._utils.batching import RequestBatcher  # noqa: F401
     from web3._utils.empty import Empty  # noqa: F401
 
 
@@ -345,7 +345,7 @@ class BaseWeb3:
 
     def batch_requests(
         self,
-    ) -> "BatchRequestContextManager[Method[Callable[..., Any]]]":
+    ) -> "RequestBatcher[Method[Callable[..., Any]]]":
         return self.manager._batch_requests()
 
 
