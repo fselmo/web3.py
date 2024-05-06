@@ -11,9 +11,11 @@ from pathlib import (
 import sys
 from typing import (
     Any,
+    List,
     Optional,
     Tuple,
     Union,
+    cast,
 )
 
 from eth_utils import (
@@ -149,13 +151,12 @@ class AsyncIPCProvider(PersistentConnectionProvider):
 
     @async_handle_request_caching
     async def make_request(self, method: RPCEndpoint, params: Any) -> RPCResponse:
-        request_data = self.encode_rpc_request(method, params)
-
         if self._writer is None:
             raise ProviderConnectionError(
                 "Connection to ipc socket has not been initiated for the provider."
             )
 
+        request_data = self.encode_rpc_request(method, params)
         try:
             self._writer.write(request_data)
             await self._writer.drain()
@@ -170,6 +171,33 @@ class AsyncIPCProvider(PersistentConnectionProvider):
         current_request_id = json.loads(request_data)["id"]
         response = await self._get_response_for_request_id(current_request_id)
 
+        return response
+
+    async def make_batch_request(
+        self, requests: List[Tuple[RPCEndpoint, Any]]
+    ) -> List[RPCResponse]:
+        if self._writer is None:
+            raise ProviderConnectionError(
+                "Connection to ipc socket has not been initiated for the provider."
+            )
+
+        request_data = self.encode_batch_rpc_request(requests)
+        try:
+            self._writer.write(request_data)
+            await self._writer.drain()
+        except OSError as e:
+            # Broken pipe
+            if e.errno == errno.EPIPE:
+                # one extra attempt, then give up
+                await self._reset_socket()
+                self._writer.write(request_data)
+                await self._writer.drain()
+
+        # generate a cache key with all the request ids hashed
+        request_ids = [rpc_request["id"] for rpc_request in json.loads(request_data)]
+        response = cast(
+            List[RPCResponse], await self._get_response_for_request_id(request_ids)
+        )
         return response
 
     async def _message_listener(self) -> None:
@@ -194,7 +222,18 @@ class AsyncIPCProvider(PersistentConnectionProvider):
                     except JSONDecodeError:
                         break
 
-                    is_subscription = response.get("method") == "eth_subscription"
+                    if isinstance(response, list):
+                        # Order responses to batch requests by `id` since the
+                        # JSON-RPC 2.0 spec doesn't guarantee order. It's important
+                        # to do this before caching since we generate and look for
+                        # cache keys using the ordered request ids.
+                        response = sorted(response, key=lambda resp: int(resp["id"]))
+
+                    is_subscription = (
+                        response.get("method") == "eth_subscription"
+                        if not isinstance(response, list)
+                        else False
+                    )
                     await self._request_processor.cache_raw_response(
                         response, subscription=is_subscription
                     )

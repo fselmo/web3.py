@@ -4,7 +4,9 @@ from abc import (
 import asyncio
 import logging
 from typing import (
+    List,
     Optional,
+    Union,
 )
 
 from web3._utils.caching import (
@@ -34,6 +36,8 @@ class PersistentConnectionProvider(AsyncJSONBaseProvider, ABC):
     _request_processor: RequestProcessor
     _message_listener_task: Optional["asyncio.Task[None]"] = None
     _listen_event: asyncio.Event = asyncio.Event()
+
+    _batch_request_counter: Optional[int] = None
 
     def __init__(
         self,
@@ -70,7 +74,7 @@ class PersistentConnectionProvider(AsyncJSONBaseProvider, ABC):
         raise NotImplementedError("Must be implemented by subclasses")
 
     async def _get_response_for_request_id(
-        self, request_id: RPCId, timeout: Optional[float] = None
+        self, request_id: Union[RPCId, List[RPCId]], timeout: Optional[float] = None
     ) -> RPCResponse:
         if timeout is None:
             timeout = self.request_timeout
