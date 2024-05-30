@@ -9,3 +9,9 @@ from .websocket_connection import (
 from .websocket_v2 import (
     WebsocketProviderV2,
 )
+
+__all__ = [
+    "WebsocketProvider",
+    "WebsocketConnection",
+    "WebsocketProviderV2",
+]
