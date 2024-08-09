@@ -435,10 +435,24 @@ jobs:
     environment:
       TOXENV: py310-core-eels
 
+  py310-core-eels-pypy:
+    <<: *common
+    docker:
+      - image: pypy:3.10-slim
+    environment:
+      TOXENV: py310-core-eels
+
   py310-core-eels_async:
     <<: *common
     docker:
       - image: cimg/python:3.10
+    environment:
+      TOXENV: py310-core-eels_async
+
+  py310-core-eels-pypy_async:
+    <<: *common
+    docker:
+      - image: pypy:3.10-slim
     environment:
       TOXENV: py310-core-eels_async
 
@@ -453,6 +467,13 @@ jobs:
     <<: *common
     docker:
       - image: cimg/python:3.10
+    environment:
+      TOXENV: py310-ens-eels
+
+  py310-ens-eels-pypy:
+    <<: *common
+    docker:
+      - image: pypy:3.10-slim
     environment:
       TOXENV: py310-ens-eels
 
@@ -516,6 +537,13 @@ jobs:
     <<: *common
     docker:
       - image: cimg/python:3.10
+    environment:
+      TOXENV: py310-integration-ethtester-eels
+
+  py310-integration-ethtester-eels-pypy:
+    <<: *common
+    docker:
+      - image: pypy:3.10-slim
     environment:
       TOXENV: py310-integration-ethtester-eels
 
@@ -807,6 +835,7 @@ jobs:
 define: &all_jobs
   # These are the longest running tests, start them first
   - py310-core-eels
+  - py310-core-eels-pypy
   - py311-core-eels
   - py312-core-eels
   - py38-core-pyevm
@@ -815,6 +844,7 @@ define: &all_jobs
   - py311-core-pyevm
   - py312-core-pyevm
   - py310-core-eels_async
+  - py310-core-eels-pypy_async
   - py311-core-eels_async
   - py312-core-eels_async
   - py38-core-pyevm_async
@@ -849,6 +879,7 @@ define: &all_jobs
   - py310-lint
   - py310-ens-pyevm
   - py310-ens-eels
+  - py310-ens-eels-pypy
   - py310-ensip15
   - py310-integration-goethereum-ipc
   - py310-integration-goethereum-ipc_async
@@ -858,6 +889,7 @@ define: &all_jobs
   - py310-integration-goethereum-ws
   - py310-integration-ethtester-pyevm
   - py310-integration-ethtester-eels
+  - py310-integration-ethtester-eels-pypy
   - py310-wheel
   - py311-lint
   - py311-ens-pyevm
