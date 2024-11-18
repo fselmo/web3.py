@@ -544,15 +544,18 @@ class RequestManager:
     def _persistent_message_stream(self) -> "_AsyncPersistentMessageStream":
         return _AsyncPersistentMessageStream(self)
 
-    async def _get_next_message(self) -> RPCResponse:
+    async def _get_next_message(self) -> Optional[RPCResponse]:
         return await self._message_stream().__anext__()
 
-    async def _message_stream(self) -> AsyncGenerator[RPCResponse, None]:
+    async def _message_stream(
+        self,
+    ) -> AsyncGenerator[Optional[RPCResponse], None]:
         if not isinstance(self._provider, PersistentConnectionProvider):
             raise Web3TypeError(
                 "Only providers that maintain an open, persistent connection "
                 "can listen to streams."
             )
+        async_w3 = cast("AsyncWeb3", self.w3)
 
         if self._provider._message_listener_task is None:
             raise ProviderConnectionError(
@@ -564,13 +567,22 @@ class RequestManager:
                 response = await self._request_processor.pop_raw_response(
                     subscription=True
                 )
-                if (
-                    response is not None
-                    and response.get("params", {}).get("subscription")
-                    in self._request_processor.active_subscriptions
-                ):
-                    # if response is an active subscription response, process it
-                    yield await self._process_response(response)
+                if response is not None:
+                    sxn_response = await self._process_response(response)
+
+                    # call the handler is there is one, else yield the response to any
+                    # listeners
+                    for sxn in async_w3.subscription_manager.subscriptions:
+                        if sxn_response.get("subscription") == sxn.id:
+                            await sxn._handler(async_w3, sxn, sxn_response["result"])
+                    yield sxn_response
+                else:
+                    # if response is not an active subscription response, log it
+                    self.logger.debug(
+                        "Received inactive subscription from socket:\n"
+                        f"    {self._provider.get_endpoint_uri_or_ipc_path()}, "
+                        f"    response: {response}"
+                    )
             except TaskNotRunning:
                 await asyncio.sleep(0)
                 self._provider._handle_listener_task_exceptions()
@@ -643,5 +655,5 @@ class _AsyncPersistentMessageStream:
     def __aiter__(self) -> Self:
         return self
 
-    async def __anext__(self) -> RPCResponse:
+    async def __anext__(self) -> Optional[RPCResponse]:
         return await self.manager._get_next_message()
