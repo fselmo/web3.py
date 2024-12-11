@@ -472,7 +472,13 @@ class BaseContractEvents:
                     address=self.address,
                     abi=event,
                 )
-                setattr(self, abi_signature, event_factory)
+
+                # Set event name on instance if it does not already exist
+                if event["name"] not in self.__dict__:
+                    setattr(self, event["name"], event_factory)
+
+                # Set underscore prefixed event signature on instance
+                setattr(self, f"_{abi_signature}", event_factory)
 
         if _events:
             self._events = _events

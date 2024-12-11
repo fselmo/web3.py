@@ -283,16 +283,19 @@ class AsyncContractEvents(BaseContractEvents):
                 "The abi for this contract contains no event definitions. ",
                 "Are you sure you provided the correct contract abi?",
             )
+        elif get_name_from_abi_element_identifier(event_name) not in [
+            get_name_from_abi_element_identifier(event["name"])
+            for event in self._events
+        ]:
+            raise ABIEventNotFound(
+                f"The event '{event_name}' was not found in this contract's abi. ",
+                "Are you sure you provided the correct contract abi?",
+            )
 
-        event_signature = event_name
-        if "(" not in event_name:
-            event_signature = _get_abi_signature_with_name(event_name, self._events)
-            if not event_signature:
-                raise ABIEventNotFound(
-                    f"The event '{event_name}' was not found in this contract's abi."
-                )
+        if "(" in event_name:
+            event_name = f"_{event_name}"
 
-        return super().__getattribute__(event_signature)
+        return super().__getattribute__(event_name)
 
     def __getitem__(self, event_name: str) -> "AsyncContractEvent":
         return getattr(self, event_name)
@@ -573,20 +576,20 @@ class AsyncContractFunctions(BaseContractFunctions):
                 "The abi for this contract contains no function definitions. ",
                 "Are you sure you provided the correct contract abi?",
             )
-
-        function_signature = function_name
-        if "(" not in function_name:
-            function_signature = _get_abi_signature_with_name(
-                function_name, self._functions
+        elif get_name_from_abi_element_identifier(function_name) not in [
+            get_name_from_abi_element_identifier(function["name"])
+            for function in self._functions
+        ]:
+            raise ABIFunctionNotFound(
+                f"The function '{function_name}' was not found in this ",
+                "contract's abi.",
             )
-            if not function_signature:
-                raise ABIFunctionNotFound(
-                    f"The function '{function_name}' was not found in this ",
-                    "contract's abi.",
-                )
+
+        if "(" not in function_name:
+            function_name = _get_abi_signature_with_name(function_name, self._functions)
 
         return super().__getattribute__(
-            function_signature,
+            function_name,
         )
 
     def __getitem__(self, function_name: str) -> "AsyncContractFunction":
