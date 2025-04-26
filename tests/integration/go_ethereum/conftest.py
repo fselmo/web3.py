@@ -29,9 +29,6 @@ from web3._utils.contract_sources.contract_data.revert_contract import (
 from web3._utils.contract_sources.contract_data.storage_contract import (
     STORAGE_CONTRACT_DATA,
 )
-from web3.exceptions import (
-    Web3Exception,
-)
 
 from .utils import (
     kill_proc_gracefully,
@@ -39,13 +36,6 @@ from .utils import (
 
 KEYFILE_PW = "web3py-test"
 GETH_FIXTURE_ZIP = "geth-1.15.5-fixture.zip"
-
-PORT_REGEX = re.compile(r"127\.0\.0\.1:(\d+)")
-INTERRUPT_REGEX = re.compile(r"interrupt, shutting down")
-
-
-class ShouldRestartGethProcess(Web3Exception):
-    pass
 
 
 @pytest.fixture
@@ -146,7 +136,6 @@ def genesis_file(datadir):
 
 def wait_for_port(proc, timeout=10):
     start = time.time()
-    port = None
     wait_time = start + timeout
 
     while time.time() < wait_time:
@@ -154,23 +143,12 @@ def wait_for_port(proc, timeout=10):
         if not line:
             continue
 
-        if port is not None:
-            if INTERRUPT_REGEX.search(line):
-                raise ShouldRestartGethProcess(
-                    "Geth process interrupted after port assignment"
-                )
-        else:
-            if match := PORT_REGEX.search(line):
-                port = int(match.group(1))
-                if port == 80:
-                    port = None
-                else:
-                    # found port, but give a grace period for any interrupt called
-                    wait_time = time.time() + 0.1
+        if match := re.compile(r"127\.0\.0\.1:(\d+)").search(line):
+            port = int(match.group(1))
+            if port not in {0, 80}:
+                return port
 
-    if port is None:
-        raise TimeoutError(f"Did not find port in logs within {timeout} seconds")
-    return port
+    raise TimeoutError(f"Did not find port in logs within {timeout} seconds")
 
 
 @pytest.fixture
@@ -185,48 +163,21 @@ def start_geth_process_and_yield_port(
         str(genesis_file),
     )
     subprocess.check_output(init_cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen(
+        geth_command_arguments,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
 
-    tries = 2
-    proc = None
-    port = None
+    port = wait_for_port(proc)
+    yield port
 
-    while tries > 0:
-        proc = subprocess.Popen(
-            geth_command_arguments,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,
-        )
-        try:
-            port = wait_for_port(proc)
-            break
-        except ShouldRestartGethProcess:
-            print("Restarting Geth process due to interrupt...")
-            kill_proc_gracefully(proc)
-            tries -= 1
-            if tries == 0:
-                raise RuntimeError("Failed to start Geth after retries")
-        except Exception:
-            kill_proc_gracefully(proc)
-            raise
-
-    if port is None:
-        raise RuntimeError("Failed to obtain port after Geth start")
-
-    try:
-        yield port
-    finally:
-        if proc:
-            kill_proc_gracefully(proc)
-            try:
-                output, errors = proc.communicate(timeout=5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                output, errors = proc.communicate()
-            print(
-                "Geth Process Exited:\n" f"stdout:{output}\n\n" f"stderr:{errors}\n\n"
-            )
+    kill_proc_gracefully(proc)
+    output, errors = proc.communicate(timeout=5)
+    print("Geth Process Exited:\n" f"stdout: {output}\n\n" f"stderr: {errors}\n\n")
 
 
 @pytest.fixture
