@@ -6,6 +6,30 @@ v7 Breaking Changes Summary
 
 .. towncrier release notes start
 
+web3.py v7.14.1 (2026-02-03)
+----------------------------
+
+Bugfixes
+~~~~~~~~
+
+- Wrap timeout in ClientTimeout for AsyncBeacon post request (`#3784 <https://github.com/ethereum/web3.py/issues/3784>`__)
+- Fix ``HTTPProvider`` to share an explicitly provided ``session`` across all threads, rather than only the creating thread. (`#3800 <https://github.com/ethereum/web3.py/issues/3800>`__)
+- Fix TypedDict field names to use camelCase (``validatorIndex``, ``yParity``) matching JSON-RPC conventions and formatter outputs. (`#3801 <https://github.com/ethereum/web3.py/issues/3801>`__)
+- Exclude type checking in Sphinx module and submodules (`#3803 <https://github.com/ethereum/web3.py/issues/3803>`__)
+
+
+Improved Documentation
+~~~~~~~~~~~~~~~~~~~~~~
+
+- Added documentation for formatters explaining how they work, what the default formatters do, and how to customize them. (`#2994 <https://github.com/ethereum/web3.py/issues/2994>`__)
+
+
+Internal Changes - for web3.py Contributors
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Upgrade geth version in CI (`#3787 <https://github.com/ethereum/web3.py/issues/3787>`__)
+
+
 web3.py v7.14.0 (2025-10-16)
 ----------------------------
 
