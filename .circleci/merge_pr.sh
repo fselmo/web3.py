@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 
-if [[ -n "${CIRCLE_PR_NUMBER}" ]]; then
-  PR_INFO_URL=https://api.github.com/repos/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pulls/$CIRCLE_PR_NUMBER
-  PR_BASE_BRANCH=$(curl -L "$PR_INFO_URL" | python -c 'import json, sys; obj = json.load(sys.stdin); sys.stdout.write(obj["base"]["ref"])')
+if [[ -n "${CIRCLE_PULL_REQUEST}" ]]; then
+  PR_INFO_URL="${CIRCLE_PULL_REQUEST/\/pull\//\/pulls\/}"
+  PR_INFO_URL="${PR_INFO_URL/github.com/api.github.com\/repos}"
+  echo "Fetching PR info from: $PR_INFO_URL"
+  PR_RESPONSE=$(curl -L "$PR_INFO_URL")
+  PR_BASE_BRANCH=$(echo "$PR_RESPONSE" | python -c 'import json, sys; obj = json.load(sys.stdin); print(obj.get("base", {}).get("ref", ""))' 2>/dev/null)
+  if [[ -z "$PR_BASE_BRANCH" ]]; then
+    echo "Could not determine PR base branch from API response: $PR_RESPONSE"
+    echo "Skipping merge step."
+    exit 0
+  fi
   git fetch origin +"$PR_BASE_BRANCH":circleci/pr-base
   # We need these config values or git complains when creating the
   # merge commit
